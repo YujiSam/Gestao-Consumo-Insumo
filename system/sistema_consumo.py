@@ -58,25 +58,42 @@ class SistemaConsumo:
         id_counter = 1  # Contador para dar um ID único para cada produto
         hoje = datetime.date.today()  # Data de hoje
         
-        # 🧪 CRIAR REAGENTES (produtos para exames)
+        # Criar reagentes
         for i, nome in enumerate(nomes_reagentes):
-            # Gera uma data de validade aleatória (entre 2 meses e 1 ano)
-            validade = hoje + datetime.timedelta(days=random.randint(60, 365))
-            # Quantidade aleatória em estoque (entre 200 e 500 unidades)
+            # Sorteia o tipo de validade
+            tipo_validade = random.choice(['dentro', 'proximo', 'vencido_recente', 'muito_vencido'])
+            
+            if tipo_validade == 'dentro':
+                dias = random.randint(60, 365)  # Dentro da validade
+            elif tipo_validade == 'proximo':
+                dias = random.randint(1, 30)    # Próximo a vencer
+            elif tipo_validade == 'vencido_recente':
+                dias = random.randint(-30, -1)  # Vencido recentemente
+            else:  # muito_vencido
+                dias = random.randint(-365, -31)  # Muito vencido
+            
+            validade = hoje + datetime.timedelta(days=dias)
             quantidade = random.randint(200, 500)
-            # Cria o produto e adiciona na lista de insumos
             self.insumos.append(Insumo(id_counter, nome, quantidade, validade, 'reagente', custos_reagentes[i]))
-            id_counter += 1  # Próximo ID
+            id_counter += 1
         
-        # 🧤 CRIAR DESCATÁVEIS (produtos de uso único)  
+        # Criar descartáveis (com mesma lógica)
         for i, nome in enumerate(nomes_descartaveis):
-            # Validade mais longa (entre 3 meses e 2 anos)
-            validade = hoje + datetime.timedelta(days=random.randint(90, 730))
-            # Maior quantidade em estoque (entre 300 e 800 unidades)
+            tipo_validade = random.choice(['dentro', 'proximo', 'vencido_recente', 'muito_vencido'])
+            
+            if tipo_validade == 'dentro':
+                dias = random.randint(90, 730)
+            elif tipo_validade == 'proximo':
+                dias = random.randint(1, 30)
+            elif tipo_validade == 'vencido_recente':
+                dias = random.randint(-30, -1)
+            else:
+                dias = random.randint(-365, -31)
+            
+            validade = hoje + datetime.timedelta(days=dias)
             quantidade = random.randint(300, 800)
-            # Cria o produto e adiciona na lista
             self.insumos.append(Insumo(id_counter, nome, quantidade, validade, 'descartavel', custos_descartaveis[i]))
-            id_counter += 1  # Próximo ID
+            id_counter += 1
     
     def simular_consumo_diario(self, dias: int = 30):
         """
@@ -89,57 +106,49 @@ class SistemaConsumo:
         
         Parâmetro: dias = quantos dias quer simular (padrão: 30 dias)
         """
-        hoje = datetime.date.today()  # Data atual
-        
-        # Para cada dia que vamos simular
+        hoje = datetime.date.today()
+    
         for dia in range(dias):
-            # Calcula a data desse dia (começando de hoje e voltando no tempo)
             data = hoje - datetime.timedelta(days=dia)
             
-            # 📋 Filtra apenas os produtos que ainda têm estoque
+            for insumo in self.insumos:
+                if insumo.quantidade < 0:
+                    insumo.quantidade = 0
+            
+            # Filtra apenas insumos com estoque positivo
             insumos_disponiveis = [insumo for insumo in self.insumos if insumo.quantidade > 0]
             
-            # Se não tiver mais produtos disponíveis, pula o dia
             if not insumos_disponiveis:
-                continue  # Vai para o próximo dia
-                
-            # 🎲 Escolhe quantos produtos serão usados neste dia (2 a 5, ou menos se tiver poucos)
+                print(f"📅 {data}: Todos os insumos esgotados")
+                continue
+                    
             num_consumos = random.randint(2, min(5, len(insumos_disponiveis)))
-            # Escolhe aleatoriamente quais produtos serão usados
             insumos_do_dia = random.sample(insumos_disponiveis, num_consumos)
             
-            # Para cada produto escolhido para ser usado neste dia
             for insumo in insumos_do_dia:
-                # 🔢 Calcula quanto pode ser consumido (no máximo 20 unidades por vez)
-                max_consumo_possivel = min(20, insumo.quantidade)
-                
-                # Se não tiver quantidade suficiente, pula este produto
-                if max_consumo_possivel < 1:
+                # 🛡️ PROTEÇÃO MÁXIMA: Verifica estoque novamente
+                if insumo.quantidade <= 0:
                     continue
+                    
+                # Calcula consumo seguro
+                max_consumo = min(20, insumo.quantidade)
+                if max_consumo <= 0:
+                    continue
+                    
+                quantidade_consumida = random.randint(1, max_consumo)
                 
-                # 📊 Define a quantidade mínima que pode ser consumida (1 unidade)
-                min_consumo = 1
+                # 🎯 GARANTIA FINAL: Não deixa ficar negativo
+                if quantidade_consumida > insumo.quantidade:
+                    quantidade_consumida = insumo.quantidade
                 
-                # Se o máximo possível for menor que o mínimo, usa o máximo
-                if max_consumo_possivel < min_consumo:
-                    quantidade_consumida = max_consumo_possivel
-                else:
-                    # Gera uma quantidade aleatória entre 1 e o máximo possível
-                    quantidade_consumida = random.randint(min_consumo, max_consumo_possivel)
-                
-                # ➖ Reduz a quantidade no estoque do produto
+                # Atualiza estoque
                 insumo.quantidade -= quantidade_consumida
                 
-                # 📝 Cria um registro desse consumo
+                # Cria registro
                 registro = RegistroConsumo(insumo, data, quantidade_consumida)
-                
-                # 📥 Adiciona o registro em todas as estruturas:
-                self.fila_consumo.enfileirar(registro)     # Na fila (ordem cronológica)
-                self.pilha_consulta.empilhar(registro)     # Na pilha (ordem inversa)
-                self.registros_completos.append(registro)  # Na lista completa (para buscas)
-    
-    # (Aqui viriam os outros métodos: busca_sequencial, busca_binaria_por_data, etc.)
-    # que já foram implementados mas não estão mostrados neste trecho
+                self.fila_consumo.enfileirar(registro)
+                self.pilha_consulta.empilhar(registro)
+                self.registros_completos.append(registro)
 
     def busca_sequencial(self, nome_insumo: str):
         """Busca sequencial dentro dos registros do sistema"""
@@ -209,7 +218,7 @@ class SistemaConsumo:
             ordenados = self.merge_sort_por_quantidade(self.registros_completos[:3])
             for i, registro in enumerate(ordenados):
                 print(f"{i+1}. {registro.insumo.nome}: {registro.quantidade_consumida} unidades")
-
+        
 # 💡 NOTA: Os métodos de busca e ordenação já estão implementados,
 # mas como estão em arquivos separados (algorithms/busca.py e algorithms/ordenacao.py),
 # não precisam ser repetidos aqui. O sistema já pode usá-los através dos imports!
