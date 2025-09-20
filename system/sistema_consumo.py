@@ -141,6 +141,75 @@ class SistemaConsumo:
     # (Aqui viriam os outros métodos: busca_sequencial, busca_binaria_por_data, etc.)
     # que já foram implementados mas não estão mostrados neste trecho
 
+    def busca_sequencial(self, nome_insumo: str):
+        """Busca sequencial dentro dos registros do sistema"""
+        from algorithms.busca import busca_sequencial as busca_seq
+        return busca_seq(self.registros_completos, nome_insumo)
+    
+    def merge_sort_por_quantidade(self, registros: List[RegistroConsumo]):
+        """Ordena registros por quantidade usando merge sort"""
+        from algorithms.ordenacao import merge_sort_por_quantidade as merge_sort
+        return merge_sort(registros)
+    
+    def quick_sort_por_validade(self, registros: List[RegistroConsumo]):
+        """Ordena registros por validade usando quick sort"""
+        from algorithms.ordenacao import quick_sort_por_validade as quick_sort
+        return quick_sort(registros)
+
+    def gerar_relatorio_completo(self):
+        """Gera um relatório completo com todos os dados"""
+        print("=" * 80)
+        print("📋 RELATÓRIO COMPLETO DO SISTEMA")
+        print("=" * 80)
+        
+        # 1. Mostra estoque atual
+        print("\n📦 ESTOQUE ATUAL:")
+        print("-" * 40)
+        for insumo in self.insumos:
+            print(f"• {insumo.nome}: {insumo.quantidade} unidades (Validade: {insumo.validade})")
+        
+        # 2. Mostra estatísticas básicas
+        print(f"\n📊 ESTATÍSTICAS:")
+        print("-" * 40)
+        print(f"• Total de insumos: {len(self.insumos)}")
+        print(f"• Total de registros: {len(self.registros_completos)}")
+        
+        if self.registros_completos:
+            consumo_total = sum(r.quantidade_consumida for r in self.registros_completos)
+            custo_total = sum(r.custo_total for r in self.registros_completos)
+            print(f"• Consumo total: {consumo_total} unidades")
+            print(f"• Custo total: R$ {custo_total:.2f}")
+        
+        # 3. Testa a fila (ordem cronológica)
+        print(f"\n⏰ PRIMEIROS REGISTROS (FILA - ORDEM CRONOLÓGICA):")
+        print("-" * 60)
+        for i, registro in enumerate(self.fila_consumo.registros[:3]):
+            print(f"{i+1}. {registro}")
+        
+        # 4. Testa a pilha (ordem inversa)
+        print(f"\n🔙 ÚLTIMOS REGISTROS (PILHA - ORDEM INVERSA):")
+        print("-" * 60)
+        ultimos = self.pilha_consulta.registros[-3:] if self.pilha_consulta.registros else []
+        for i, registro in enumerate(reversed(ultimos)):
+            print(f"{i+1}. {registro}")
+        
+        # 5. Testa busca sequencial
+        print(f"\n🔍 BUSCA SEQUENCIAL ('Reagente A'):")
+        print("-" * 40)
+        resultados = self.busca_sequencial("Reagente A")
+        for i, registro in enumerate(resultados[:2]):
+            print(f"{i+1}. {registro}")
+        if len(resultados) > 2:
+            print(f"... e mais {len(resultados) - 2} registros")
+        
+        # 6. Testa ordenação
+        if self.registros_completos:
+            print(f"\n📊 ORDENAÇÃO POR QUANTIDADE (TOP 3):")
+            print("-" * 40)
+            ordenados = self.merge_sort_por_quantidade(self.registros_completos[:3])
+            for i, registro in enumerate(ordenados):
+                print(f"{i+1}. {registro.insumo.nome}: {registro.quantidade_consumida} unidades")
+
 # 💡 NOTA: Os métodos de busca e ordenação já estão implementados,
 # mas como estão em arquivos separados (algorithms/busca.py e algorithms/ordenacao.py),
 # não precisam ser repetidos aqui. O sistema já pode usá-los através dos imports!

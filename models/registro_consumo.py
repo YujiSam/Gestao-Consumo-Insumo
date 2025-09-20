@@ -17,6 +17,8 @@ class RegistroConsumo:
         self.data = data  # Data do uso
         self.quantidade_consumida = quantidade_consumida  # Quantas unidades usadas
         self.custo_total = quantidade_consumida * insumo.custo_unitario  # Custo total
+
+        insumo.quantidade -= quantidade_consumida
     
     def __str__(self):
         """
