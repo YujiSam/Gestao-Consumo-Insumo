@@ -119,3 +119,16 @@ python main.py
 
 ## Executar testes
 python -m pytest tests/
+
+# 🖊️Autores:
+
+Gustavo Yuji Osugi - RM 555034
+
+Otavio Santos de Lima Ferrão - RM 556452
+
+Renan Simões Gonçalves - RM 555584
+
+Victor Hugo de Paula - RM 554787
+
+Vitor Rivas Cardoso - RM 556404
+
