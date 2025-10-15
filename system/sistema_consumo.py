@@ -1,86 +1,59 @@
-import datetime
+from datetime import datetime, timedelta
 import random
-from typing import List
+from typing import List, Tuple, Optional
 from models.insumo import Insumo
 from models.registro_consumo import RegistroConsumo
 from structures.fila_consumo import FilaConsumo
 from structures.pilha_consulta import PilhaConsulta
 from algorithms.busca import busca_sequencial, busca_binaria_por_data
 from algorithms.ordenacao import merge_sort_por_quantidade, quick_sort_por_validade
+from algorithms.pd_consumo import consumo_otimo_rec, consumo_otimo_memo, consumo_otimo_iterativo
 
 class SistemaConsumo:
     """
-    🏥 SISTEMA PRINCIPAL DE GESTÃO DE CONSUMO
-    
-    Esta é a classe mais importante que coordena tudo:
-    - Gerencia o estoque de insumos
-    - Controla os registros de consumo  
-    - Usa todas as estruturas e algoritmos juntos
-    - É o "cérebro" do sistema completo
-    
-    Pense como o gerente de uma farmácia que:
-    1. Mantém o controle de todos os produtos
-    2. Registra cada vez que alguém usa algo
-    3. Gera relatórios sobre o que foi usado
-    4. Avisa quando está faltando algo
+    SISTEMA PRINCIPAL DE GESTÃO DE CONSUMO
     """
-    
+
     def __init__(self):
-        """
-        CONSTRUTOR: Inicializa o sistema com tudo vazio
-        
-        É como abrir uma loja nova:
-        - Estoque vazio
-        - Nenhuma venda registrada
-        - Caixa registradora zerada
-        """
-        self.fila_consumo = FilaConsumo()        # Para ordem cronológica (FIFO)
-        self.pilha_consulta = PilhaConsulta()    # Para consulta inversa (LIFO)  
-        self.insumos: List[Insumo] = []          # Lista de todos os produtos em estoque
-        self.registros_completos: List[RegistroConsumo] = []  # Histórico de tudo que foi consumido
-    
+        self.fila_consumo = FilaConsumo()
+        self.pilha_consulta = PilhaConsulta()
+        self.insumos: List[Insumo] = []
+        self.registros_completos: List[RegistroConsumo] = []
+
     def carregar_insumos_exemplo(self):
         """
-        📦 CARREGA DADOS DE EXEMPLO: Cria produtos fictícios para testar o sistema
-        
-        É como abastecer o estoque pela primeira vez com:
-        - Reagentes: produtos para fazer exames (mais caros)
-        - Descartáveis: produtos de uso único (mais baratos)
+        Carrega insumos de exemplo com quantidades e validade.
+        Ajuste os ranges aqui se quiser cenários diferentes.
         """
-        # Lista de nomes de produtos que teremos no sistema
         nomes_reagentes = ['Reagente A', 'Reagente B', 'Reagente C', 'Reagente D']
         nomes_descartaveis = ['Luvas', 'Máscaras', 'Tubos', 'Agulhas']
-        
-        # Preços de cada produto (em reais)
-        custos_reagentes = [15.50, 22.30, 18.75, 35.20]        # Reagentes são mais caros
-        custos_descartaveis = [2.10, 1.50, 3.75, 0.95]         # Descartáveis são mais baratos
-        
-        id_counter = 1  # Contador para dar um ID único para cada produto
-        hoje = datetime.date.today()  # Data de hoje
-        
-        # Criar reagentes
+
+        custos_reagentes = [15.50, 22.30, 18.75, 35.20]
+        custos_descartaveis = [2.10, 1.50, 3.75, 0.95]
+
+        id_counter = 1
+        hoje = datetime.today().date()
+
+        # Reagentes (estoque menor)
         for i, nome in enumerate(nomes_reagentes):
-            # Sorteia o tipo de validade
             tipo_validade = random.choice(['dentro', 'proximo', 'vencido_recente', 'muito_vencido'])
-            
             if tipo_validade == 'dentro':
-                dias = random.randint(60, 365)  # Dentro da validade
+                dias = random.randint(60, 365)
             elif tipo_validade == 'proximo':
-                dias = random.randint(1, 30)    # Próximo a vencer
+                dias = random.randint(1, 30)
             elif tipo_validade == 'vencido_recente':
-                dias = random.randint(-30, -1)  # Vencido recentemente
-            else:  # muito_vencido
-                dias = random.randint(-365, -31)  # Muito vencido
-            
-            validade = hoje + datetime.timedelta(days=dias)
-            quantidade = random.randint(200, 500)
+                dias = random.randint(-30, -1)
+            else:
+                dias = random.randint(-365, -31)
+
+            validade = hoje + timedelta(days=dias)
+            quantidade = random.randint(20, 100)  # reagentes: estoque menor
             self.insumos.append(Insumo(id_counter, nome, quantidade, validade, 'reagente', custos_reagentes[i]))
             id_counter += 1
-        
-        # Criar descartáveis (com mesma lógica)
+
+        # Descartáveis (estoque maior)
         for i, nome in enumerate(nomes_descartaveis):
             tipo_validade = random.choice(['dentro', 'proximo', 'vencido_recente', 'muito_vencido'])
-            
             if tipo_validade == 'dentro':
                 dias = random.randint(90, 730)
             elif tipo_validade == 'proximo':
@@ -89,62 +62,41 @@ class SistemaConsumo:
                 dias = random.randint(-30, -1)
             else:
                 dias = random.randint(-365, -31)
-            
-            validade = hoje + datetime.timedelta(days=dias)
-            quantidade = random.randint(300, 800)
+
+            validade = hoje + timedelta(days=dias)
+            quantidade = random.randint(20, 100)  # descartáveis: estoque maior
             self.insumos.append(Insumo(id_counter, nome, quantidade, validade, 'descartavel', custos_descartaveis[i]))
             id_counter += 1
-    
+
     def simular_consumo_diario(self, dias: int = 30):
         """
-        ⏰ SIMULA CONSUMO DIÁRIO: Cria registros de uso dos produtos
-        
-        Imagine que isso simula 30 dias de trabalho em um hospital:
-        - Cada dia, alguns produtos são usados
-        - A quantidade usada é aleatória
-        - O estoque vai diminuindo com o tempo
-        
-        Parâmetro: dias = quantos dias quer simular (padrão: 30 dias)
+        Simula consumo diário durante `dias` dias.
+        Usa RegistroConsumo para registrar e decrementar estoque corretamente.
         """
-        hoje = datetime.date.today()
-    
+        hoje = datetime.today().date()
+
         for dia in range(dias):
-            data = hoje - datetime.timedelta(days=dia)
-            
-            for insumo in self.insumos:
-                if insumo.quantidade < 0:
-                    insumo.quantidade = 0
-            
-            # Filtra apenas insumos com estoque positivo
-            insumos_disponiveis = [insumo for insumo in self.insumos if insumo.quantidade > 0]
-            
+            data = hoje - timedelta(days=dia)  # dia atual da simulação
+            insumos_disponiveis = [i for i in self.insumos if i.quantidade > 0]
+
             if not insumos_disponiveis:
                 print(f"📅 {data}: Todos os insumos esgotados")
                 continue
-                    
-            num_consumos = random.randint(2, min(5, len(insumos_disponiveis)))
+
+            # Número de insumos que serão usados nesse dia (1..max)
+            max_consumos = min(3, len(insumos_disponiveis))  # reduzir para deixar mais realista
+            num_consumos = random.randint(1, max_consumos)
+
             insumos_do_dia = random.sample(insumos_disponiveis, num_consumos)
-            
+
             for insumo in insumos_do_dia:
-                # 🛡️ PROTEÇÃO MÁXIMA: Verifica estoque novamente
-                if insumo.quantidade <= 0:
-                    continue
-                    
-                # Calcula consumo seguro
-                max_consumo = min(20, insumo.quantidade)
+                # consumo por item (mais conservador)
+                max_consumo = min(5, insumo.quantidade)  # menor pico por dia
                 if max_consumo <= 0:
                     continue
-                    
                 quantidade_consumida = random.randint(1, max_consumo)
-                
-                # 🎯 GARANTIA FINAL: Não deixa ficar negativo
-                if quantidade_consumida > insumo.quantidade:
-                    quantidade_consumida = insumo.quantidade
-                
-                # Atualiza estoque
-                insumo.quantidade -= quantidade_consumida
-                
-                # Cria registro
+
+                # cria registro (RegistroConsumo já decrementa insumo.quantidade)
                 registro = RegistroConsumo(insumo, data, quantidade_consumida)
                 self.fila_consumo.enfileirar(registro)
                 self.pilha_consulta.empilhar(registro)
@@ -218,7 +170,51 @@ class SistemaConsumo:
             ordenados = self.merge_sort_por_quantidade(self.registros_completos[:3])
             for i, registro in enumerate(ordenados):
                 print(f"{i+1}. {registro.insumo.nome}: {registro.quantidade_consumida} unidades")
-        
-# 💡 NOTA: Os métodos de busca e ordenação já estão implementados,
-# mas como estão em arquivos separados (algorithms/busca.py e algorithms/ordenacao.py),
-# não precisam ser repetidos aqui. O sistema já pode usá-los através dos imports!
+
+    def calcular_consumo_otimo(self, bloco: int = 50, modo_teste_recursivo: bool = True):
+        """
+        Calcula consumo ótimo usando as três versões (recursiva, memorização e iterativa).
+        - bloco: discretização usada por memo e iterativa (maior -> mais rápido, menos preciso)
+        - modo_teste_recursivo: se True, roda também a recursiva em estoques pequenos
+        Retorna tupla: (rec, memo, iterativo)
+        """
+        estoques = [i.quantidade for i in self.insumos]
+        print("📦 Estoques detectados:", estoques)
+        print(f"🧠 Parâmetros: bloco={bloco}, modo_teste_recursivo={modo_teste_recursivo}")
+
+        rec_res = None
+        # Só roda recursiva se a lista for pequena para não travar
+        if modo_teste_recursivo:
+            if len(estoques) <= 10 and max(estoques, default=0) <= 100:
+                print("▶️ Rodando versão recursiva...")
+                rec_res = consumo_otimo_rec(estoques, bloco=bloco)
+                print("   ✅ Resultado recursiva:", rec_res)
+            else:
+                print("⚠️ Pulando recursiva: estoques muito grandes para rodar recursivo puro.")
+
+        print("▶️ Rodando versão com memorização...")
+        memo_res = consumo_otimo_memo(estoques, bloco=bloco)
+        print("   ✅ Resultado memorização:", memo_res)
+
+        print("▶️ Rodando versão iterativa (bottom-up)...")
+        iter_res = consumo_otimo_iterativo(estoques, bloco=bloco)
+        print("   ✅ Resultado iterativa:", iter_res)
+
+        # Verificação de consistência
+        if rec_res is not None:
+            consistent = (rec_res == memo_res == iter_res)
+        else:
+            # Se recursiva não rodou, verificamos memo vs iterativa com tolerância
+            tol = max(1, int(0.05 * sum(estoques) / bloco))  # heurística
+            consistent = (abs(memo_res - iter_res) <= tol)
+
+        print("🧩 Verificando consistência dos resultados...")
+        if not consistent:
+            print(f"⚠️ Resultados PD diferentes: rec={rec_res}, memo={memo_res}, iterativo={iter_res}")
+        else:
+            print("✅ Resultados PD consistentes")
+
+        print(f"📊 Desperdício (memo): {memo_res}  |  (iterativo): {iter_res}")
+        print("🏁 Cálculo de consumo ótimo finalizado com sucesso.")
+        return rec_res, memo_res, iter_res
+

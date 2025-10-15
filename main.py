@@ -32,5 +32,7 @@ def main():
     
     print("✅ Todos os gráficos gerados!")
 
+    sistema.calcular_consumo_otimo()
+
 if __name__ == "__main__":
     main()
